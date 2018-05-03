@@ -118,3 +118,50 @@ It seems to be possible to create, delete, and re-create a stack of
 the same name. Strangely enough, even after the stack is deleted, the
 command above has a zero exit status.
 
+* sample template: VPC with single EC2 instance
+
+https://us-west-2.console.aws.amazon.com/cloudformation/designer/home?region=us-west-2&templateURL=https%3A%2F%2Fs3-us-west-2.amazonaws.com%2Fcloudformation-templates-us-west-2%2FVPC_Single_Instance_In_Subnet.template#
+
+Save this to =templates/vpc-single-ec2-instance.json=
+
+Deploy it
+
+#+BEGIN_SRC sh
+aws cloudformation deploy --template-file templates/vpc-single-ec2-instance.json --stack-name vpc-single-ec2-instance-test
+#+END_SRC
+
+: An error occurred (ValidationError) when calling the CreateChangeSet operation:
+: Parameters: [KeyName] must have values
+
+Ah, it appears that some parameters are required... would be nice to be able to get a listing of these ahead of time...
+
+#+BEGIN_SRC sh
+aws cloudformation validate-template --template-body file://templates/vpc-single-ec2-instance.json
+#+END_SRC
+#+begin_example
+
+{
+    "Parameters": [
+        {
+            "ParameterKey": "KeyName",
+            "NoEcho": false,
+            "Description": "Name of an existing EC2 KeyPair to enable SSH access to the instance"
+        },
+        {
+            "ParameterKey": "SSHLocation",
+            "DefaultValue": "0.0.0.0/0",
+            "NoEcho": false,
+            "Description": " The IP address range that can be used to SSH to the EC2 instances"
+        },
+        {
+            "ParameterKey": "InstanceType",
+            "DefaultValue": "t2.small",
+            "NoEcho": false,
+            "Description": "WebServer EC2 instance type"
+        }
+    ],
+    "Description": "AWS CloudFormation Sample Template VPC_Single_Instance_In_Subnet: Sample template showing how to create a VPC and add an EC2 instance with an Elastic IP address and a security group. **WARNING** This template creates an Amazon EC2 instance. You will be billed for the AWS resources used if you create a stack from this template."
+}
+#+end_example
+
+So it looks like only KeyName is required?
