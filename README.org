@@ -1,0 +1,19 @@
+#+TITLE: Kicking the tires of AWS CloudFormation
+
+* Objective
+
+- VPC
+- elastic IP
+- 2 EC2 webservers instances with a load balancer
+- Shibboleth SP running on each webserver
+- Postgresql RDS instance
+
+* Resources
+
+- Getting Started Guide
+https://docs.aws.amazon.com/AWSCloudFormation/latest/UserGuide/GettingStarted.Walkthrough.html
+- VPC
+https://docs.aws.amazon.com/AWSCloudFormation/latest/UserGuide/sample-templates-services-us-west-2.html#w2ab2c23c48c13c39
+- Single and multi-server web apps (LAMP stacks)
+https://docs.aws.amazon.com/AWSCloudFormation/latest/UserGuide/sample-templates-appframeworks-us-west-2.html
+
