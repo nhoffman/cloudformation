@@ -1,0 +1,1 @@
+export AWS_CONFIG_FILE=aws_config

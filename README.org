@@ -10,10 +10,60 @@
 
 * Resources
 
-- Getting Started Guide
-https://docs.aws.amazon.com/AWSCloudFormation/latest/UserGuide/GettingStarted.Walkthrough.html
-- VPC
-https://docs.aws.amazon.com/AWSCloudFormation/latest/UserGuide/sample-templates-services-us-west-2.html#w2ab2c23c48c13c39
-- Single and multi-server web apps (LAMP stacks)
-https://docs.aws.amazon.com/AWSCloudFormation/latest/UserGuide/sample-templates-appframeworks-us-west-2.html
+- Getting Started Guide: https://docs.aws.amazon.com/AWSCloudFormation/latest/UserGuide/GettingStarted.Walkthrough.html
+- VPC: https://docs.aws.amazon.com/AWSCloudFormation/latest/UserGuide/sample-templates-services-us-west-2.html#w2ab2c23c48c13c39
+- Single and multi-server web apps (LAMP stacks): https://docs.aws.amazon.com/AWSCloudFormation/latest/UserGuide/sample-templates-appframeworks-us-west-2.html
+
+* AWS CLI
+
+** install
+
+- https://docs.aws.amazon.com/cli/latest/userguide/cli-install-macos.html
+
+#+BEGIN_SRC sh
+python3 -m venv py3-env
+source py3-env/bin/activate
+pip install -U pip
+pip install awscli
+#+END_SRC
+
+** configure
+
+- https://docs.aws.amazon.com/cli/latest/userguide/cli-chap-getting-started.html
+- https://docs.aws.amazon.com/cli/latest/userguide/cli-config-files.html
+
+This boils down to creating access keys and providing them in the CLI
+execution environment. There's an option to specify an alternative location for the credentials file using =AWS_CONFIG_FILE=, so that's what we're going to do:
+
+#+BEGIN_SRC sh
+cat <<EOF > setenv.sh
+export AWS_CONFIG_FILE=aws_config
+EOF
+
+source setenv.sh
+
+cat <<EOF > $AWS_CONFIG_FILE
+[default]
+region=us-west-2
+output=json
+aws_access_key_id=
+aws_secret_access_key=
+EOF
+
+chmod 600 aws_config
+
+touch .gitignore
+echo $AWS_CONFIG_FILE >> .gitignore
+#+END_SRC
+
+#+RESULTS:
+
+Now edit the file and add access and secret keys as described here: https://docs.aws.amazon.com/cli/latest/userguide/cli-chap-getting-started.html
+
+Now test credentials
+
+#+BEGIN_SRC sh
+source setenv.sh
+aws sts get-caller-identity
+#+END_SRC
 
