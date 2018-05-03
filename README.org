@@ -58,12 +58,63 @@ echo $AWS_CONFIG_FILE >> .gitignore
 
 #+RESULTS:
 
-Now edit the file and add access and secret keys as described here: https://docs.aws.amazon.com/cli/latest/userguide/cli-chap-getting-started.html
+Edit the file and add access and secret keys as described here: https://docs.aws.amazon.com/cli/latest/userguide/cli-chap-getting-started.html
 
-Now test credentials
+Test credentials
 
 #+BEGIN_SRC sh
 source setenv.sh
 aws sts get-caller-identity
 #+END_SRC
+
+* hello bucket
+
+Experiment with a simple template
+
+- https://docs.aws.amazon.com/AWSCloudFormation/latest/UserGuide/gettingstarted.templatebasics.html#gettingstarted.templatebasics.simple
+- https://docs.aws.amazon.com/cli/latest/reference/cloudformation/deploy/index.html
+
+#+BEGIN_SRC sh
+mkdir -p templates
+cat <<EOF > templates/hello-bucket.json
+{
+    "Resources" : {
+        "HelloBucket" : {
+            "Type" : "AWS::S3::Bucket"
+        }
+    }
+}
+EOF
+#+END_SRC
+
+#+RESULTS:
+
+Deploy it
+
+#+BEGIN_SRC sh
+aws cloudformation deploy --template-file templates/hello-bucket.json --stack-name hello-bucket
+#+END_SRC
+
+Message first time:
+
+: Waiting for changeset to be created..
+: Waiting for stack create/update to complete
+: Successfully created/updated stack - hello-bucket
+
+Message second time:
+
+: Waiting for changeset to be created..
+: No changes to deploy. Stack hello-bucket is up to date
+
+Cool. This shows up in the console as =hello-bucket-hellobucket-10h81fwaaap0g= - how do I identify the just-built resource from the CLI?
+
+Delete it
+
+#+BEGIN_SRC sh
+aws cloudformation delete-stack --stack-name hello-bucket
+#+END_SRC
+
+It seems to be possible to create, delete, and re-create a stack of
+the same name. Strangely enough, even after the stack is deleted, the
+command above has a zero exit status.
 
