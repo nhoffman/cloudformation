@@ -36,10 +36,17 @@ This boils down to creating access keys and providing them in the CLI
 execution environment. There's an option to specify an alternative location for the credentials file using =AWS_CONFIG_FILE=, so that's what we're going to do:
 
 #+BEGIN_SRC sh
+mkdir -p secrets
 cat <<EOF > setenv.sh
-export AWS_CONFIG_FILE=aws_config
+export AWS_CONFIG_FILE=secrets/aws_config
+export AWS_KEY_NAME=vpc-test.pem
+export AWS_KEY_PATH=secrets/\$AWS_KEY_NAME
 EOF
+#+END_SRC
 
+#+RESULTS:
+
+#+BEGIN_SRC sh
 source setenv.sh
 
 cat <<EOF > $AWS_CONFIG_FILE
@@ -53,7 +60,7 @@ EOF
 chmod 600 aws_config
 
 touch .gitignore
-echo $AWS_CONFIG_FILE >> .gitignore
+echo /secrets >> .gitignore
 #+END_SRC
 
 #+RESULTS:
@@ -118,6 +125,20 @@ It seems to be possible to create, delete, and re-create a stack of
 the same name. Strangely enough, even after the stack is deleted, the
 command above has a zero exit status.
 
+Wait, there's also =create-stack= - what's the difference?
+
+#+BEGIN_SRC sh
+aws cloudformation create-stack --template-body file://templates/hello-bucket.json --stack-name hello-bucket
+#+END_SRC
+
+Well, this time there's some more useful output:
+
+: {
+:     "StackId": "arn:aws:cloudformation:us-west-2:721970950229:stack/hello-bucket/e61839a0-4f52-11e8-b797-503ac93168c5"
+: }
+
+So... when to use deploy vs create-stack?
+
 * sample template: VPC with single EC2 instance
 
 https://us-west-2.console.aws.amazon.com/cloudformation/designer/home?region=us-west-2&templateURL=https%3A%2F%2Fs3-us-west-2.amazonaws.com%2Fcloudformation-templates-us-west-2%2FVPC_Single_Instance_In_Subnet.template#
@@ -127,7 +148,9 @@ Save this to =templates/vpc-single-ec2-instance.json=
 Deploy it
 
 #+BEGIN_SRC sh
-aws cloudformation deploy --template-file templates/vpc-single-ec2-instance.json --stack-name vpc-single-ec2-instance-test
+aws cloudformation create-stack \
+    --template-body file://templates/vpc-single-ec2-instance.json \
+    --stack-name vpc-single-ec2-instance-test
 #+END_SRC
 
 : An error occurred (ValidationError) when calling the CreateChangeSet operation:
@@ -165,3 +188,168 @@ aws cloudformation validate-template --template-body file://templates/vpc-single
 #+end_example
 
 So it looks like only KeyName is required?
+
+Get a list of key pairs
+
+#+BEGIN_SRC sh
+aws ec2 describe-key-pairs
+#+END_SRC
+
+Can also create a key pair (=$AWS_KEY_NAME=) set in =setenv.sh= above.
+
+#+BEGIN_SRC sh
+source setenv.sh
+aws ec2 create-key-pair --key-name $AWS_KEY_NAME | jq -r '.["KeyMaterial"]' > secrets/$AWS_KEY_NAME
+chmod 600 secrets/$AWS_KEY_NAME
+#+END_SRC
+
+Parameters can be provided either on the command line or in a json file: https://aws.amazon.com/blogs/devops/passing-parameters-to-cloudformation-stacks-with-the-aws-cli-and-powershell/
+
+Write a quick python script for serializing parameters as json...
+
+#+BEGIN_SRC sh :results output
+cat bin/params.py
+#+END_SRC
+
+#+RESULTS:
+#+begin_example
+#!/usr/bin/env python3
+
+"""Serialize CloudFormation template parmeters to json
+
+"""
+
+import os
+import sys
+import argparse
+import json
+from collections import OrderedDict
+
+
+def main(arguments):
+
+    parser = argparse.ArgumentParser(
+        description=__doc__,
+        formatter_class=argparse.RawDescriptionHelpFormatter)
+    parser.add_argument(
+        'params', nargs='+',
+        help="one or more key value pairs in the format 'key=value'")
+    parser.add_argument(
+        '-o', '--outfile', default=sys.stdout, type=argparse.FileType('w'),
+        help="Output file")
+
+    args = parser.parse_args(arguments)
+
+    params = []
+    for pair in args.params:
+        k, v = pair.split('=', 1)
+        params.append(OrderedDict(ParameterKey=k, ParameterValue=v))
+
+    json.dump(params, args.outfile, indent=4)
+
+
+if __name__ == '__main__':
+    sys.exit(main(sys.argv[1:]))
+#+end_example
+
+#+BEGIN_SRC sh :results output
+bin/params.py key2=val2 key=val
+#+END_SRC
+
+#+RESULTS:
+#+begin_example
+[
+    {
+        "ParameterKey": "key2",
+        "ParameterValue": "val2"
+    },
+    {
+        "ParameterKey": "key",
+        "ParameterValue": "val"
+    }
+]
+#+end_example
+
+Use this to generate params for our template (kinda silly for a single
+parameter, but I'm anticipating that there will be more later).
+
+#+BEGIN_SRC sh :results output
+source setenv.sh
+bin/params.py KeyName=$AWS_KEY_NAME -o templates/vpc-single-ec2-instance-params.json
+cat templates/vpc-single-ec2-instance-params.json
+#+END_SRC
+
+#+RESULTS:
+: [
+:     {
+:         "ParameterKey": "KeyName",
+:         "ParameterValue": "vpc-test.pem"
+:     }
+: ]
+
+Ok, here goes!
+
+#+BEGIN_SRC sh
+aws cloudformation create-stack \
+    --template-body file://templates/vpc-single-ec2-instance.json \
+    --parameters file://templates/vpc-single-ec2-instance-params.json \
+    --stack-name vpc-single-ec2-instance-test
+#+END_SRC
+
+: {
+:     "StackId": "arn:aws:cloudformation:us-west-2:721970950229:stack/vpc-single-ec2-instance-test/38aeb850-4f2c-11e8-9ecf-503ac9841a35"
+: }
+
+This returns immediately... how to monitor progress or completion?
+
+#+BEGIN_SRC sh
+aws cloudformation describe-stacks --stack-name vpc-single-ec2-instance-test
+#+END_SRC
+
+...this returns some json including a url providing a url that
+actually serves up a web page!
+
+Running a second time gives an error
+
+: An error occurred (AlreadyExistsException) when calling the CreateStack operation: Stack [vpc-single-ec2-instance-test] already exists
+
+I want to be able to retrieve various attributes about the
+newly-created objects. This seems to be one option:
+
+: aws cloudformation describe-stack-resources --stack-name vpc-single-ec2-instance-test
+
+Let's get the public IP address of the newly created EC2 instance:
+
+#+BEGIN_SRC sh
+ec2_id=$(aws cloudformation describe-stack-resources --stack-name vpc-single-ec2-instance-test | jq -r '.StackResources[] | select(.ResourceType == "AWS::EC2::Instance") | .PhysicalResourceId')
+public_ip=$(aws ec2 describe-instances --instance-ids $ec2_id | jq -r '.Reservations[] | .Instances[] | .PublicIpAddress')
+#+END_SRC
+
+Now that we can get the IP address, let's SSH in... looks like this is
+an Amazon Linux instance, and google tells me that the username for
+login is =ec2-user=.
+
+: ssh -i $AWS_KEY_PATH ec2-user@$public_ip
+
+This works. If I wanted to get a bit fancier:
+
+#+BEGIN_SRC sh
+source setenv.sh
+cat <<EOF > ssh-config
+Host vpc-test
+    HostName $public_ip
+    User ec2-user
+    IdentityFile $AWS_KEY_PATH
+EOF
+#+END_SRC
+
+#+RESULTS:
+
+: ssh -F ./ssh-config vpc-test
+
+#+RESULTS:
+
+* questions
+
+- should I set up EC2 as a reserved instance? How?
+
