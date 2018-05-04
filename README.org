@@ -137,7 +137,7 @@ Well, this time there's some more useful output:
 :     "StackId": "arn:aws:cloudformation:us-west-2:721970950229:stack/hello-bucket/e61839a0-4f52-11e8-b797-503ac93168c5"
 : }
 
-So... when to use deploy vs create-stack?
+So... it's looking like =create-stack= for creation, =deploy= for updates to the stack.
 
 * sample template: VPC with single EC2 instance
 
@@ -331,7 +331,7 @@ login is =ec2-user=.
 
 : ssh -i $AWS_KEY_PATH ec2-user@$public_ip
 
-This works. If I wanted to get a bit fancier:
+If I wanted to get a bit fancier:
 
 #+BEGIN_SRC sh
 source setenv.sh
@@ -349,7 +349,21 @@ EOF
 
 #+RESULTS:
 
+* CloudFormer
+
+- https://docs.aws.amazon.com/AWSCloudFormation/latest/UserGuide/cfn-using-cloudformer.html
+
 * questions
 
-- should I set up EC2 as a reserved instance? How?
+Assuming that I'd like to get a basic webserver + database in a VPC up
+and running before tackling adding a load balancer...
 
+- should I set up EC2 instances as reserved instance? How?
+- how do I add a common tag to all resources to track billing?
+- confirm appropriate use of =create-stack= vs =deploy=
+- how do I generate a template with a different set of AMI mapping so that
+  I'm using ubuntu 16.04?
+- how do associate an existing elastic IP, and prevent this IP from
+  being deleted along with the stack when the stack is terminated?
+- what's the best way to go about adding an RDS instance in the VPC
+  accessible from the EC2 instance? CloudFormer?
