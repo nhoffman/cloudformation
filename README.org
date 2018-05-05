@@ -367,3 +367,9 @@ and running before tackling adding a load balancer...
   being deleted along with the stack when the stack is terminated?
 - what's the best way to go about adding an RDS instance in the VPC
   accessible from the EC2 instance? CloudFormer?
+
+** Ubuntu AMI?
+
+https://github.com/awslabs/aws-cloudformation-templates/blob/master/aws/solutions/HelperNonAmaznAmi/ubuntu16.04LTS_cfn-hup.template
+
+https://raw.githubusercontent.com/awslabs/aws-cloudformation-templates/master/aws/solutions/HelperNonAmaznAmi/ubuntu16.04LTS_cfn-hup.template
