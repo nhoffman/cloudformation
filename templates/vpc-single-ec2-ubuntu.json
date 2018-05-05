@@ -28,7 +28,14 @@
       "Default": "0.0.0.0/0",
       "AllowedPattern": "(\\d{1,3})\\.(\\d{1,3})\\.(\\d{1,3})\\.(\\d{1,3})/(\\d{1,2})",
       "ConstraintDescription": "must be a valid IP CIDR range of the form x.x.x.x/x."
-    }
+    },
+
+      "AMIId" : {
+	  "Description": "AMI ID for Ubiuntu 16.04",
+	  "Type": "String",
+	  "ConstraintDescription": "An AMI ID for Ubiuntu 16.04 that is available in the current region",
+	  "Default": "ami-4e79ed36"
+      }
   },
 
   "Mappings" : {
