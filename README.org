@@ -25,6 +25,7 @@ python3 -m venv py3-env
 source py3-env/bin/activate
 pip install -U pip
 pip install awscli
+pip install jsondiff  # will comein handy later
 #+END_SRC
 
 ** configure
@@ -368,7 +369,100 @@ and running before tackling adding a load balancer...
 - what's the best way to go about adding an RDS instance in the VPC
   accessible from the EC2 instance? CloudFormer?
 
-** Ubuntu AMI?
+** Selecting an ami
+
+The strategy used in the template (a nested mapping of architectures
+to instance types to amis using two different mapping objects) seem
+like too much trouble to reproduce. How about if I just figure out
+what ami I want and provide it as a parameter?
+
+Because the various instance types are baffling, start by describing
+the instance I am already using:
+
+#+BEGIN_SRC sh
+% aws ec2 describe-images --image-ids ami-a9d276c9
+{
+    "Images": [
+        {
+            "Architecture": "x86_64",
+            "CreationDate": "2016-10-21T09:20:11.000Z",
+            "ImageId": "ami-a9d276c9",
+            "ImageLocation": "099720109477/ubuntu/images/hvm-ssd/ubuntu-xenial-16.04-amd64-server-20161020",
+            "ImageType": "machine",
+            "Public": true,
+            "OwnerId": "099720109477",
+            "State": "available",
+            "BlockDeviceMappings": [
+                {
+                    "DeviceName": "/dev/sda1",
+                    "Ebs": {
+                        "Encrypted": false,
+                        "DeleteOnTermination": true,
+                        "SnapshotId": "snap-826344d5",
+                        "VolumeSize": 8,
+                        "VolumeType": "gp2"
+                    }
+                },
+                {
+                    "DeviceName": "/dev/sdb",
+                    "VirtualName": "ephemeral0"
+                },
+                {
+                    "DeviceName": "/dev/sdc",
+                    "VirtualName": "ephemeral1"
+                }
+            ],
+            "Hypervisor": "xen",
+            "Name": "ubuntu/images/hvm-ssd/ubuntu-xenial-16.04-amd64-server-20161020",
+            "RootDeviceName": "/dev/sda1",
+            "RootDeviceType": "ebs",
+            "SriovNetSupport": "simple",
+            "VirtualizationType": "hvm"
+        }
+    ]
+}
+#+END_SRC
+
+I want the most recent Ubuntu 16.04 LTS build. This should be possible to find, right? Looks like the filter accepts wildcards:
+
+#+BEGIN_SRC sh
+aws ec2 describe-images --filters "Name=name,Values=ubuntu/images/hvm-ssd/ubuntu-xenial-16.04-amd64-server*" > xenial-lts.json
+#+END_SRC
+
+(Explanation of jq sorting behavior: https://github.com/stedolan/jq/issues/784)
+
+#+BEGIN_SRC sh
+cat xenial-lts.json | jq -r '.Images | sort_by(.CreationDate)[] | [.ImageId,.Name] | @tsv' | tail
+#+END_SRC
+
+#+RESULTS:
+| ami-79873901 | ubuntu/images/hvm-ssd/ubuntu-xenial-16.04-amd64-server-20180126                                                     |
+| ami-c62eaabe | ubuntu/images/hvm-ssd/ubuntu-xenial-16.04-amd64-server-20180205                                                     |
+| ami-0ee66876 | ubuntu/images/hvm-ssd/ubuntu-xenial-16.04-amd64-server-20180222                                                     |
+| ami-78a22900 | ubuntu/images/hvm-ssd/ubuntu-xenial-16.04-amd64-server-20180228.1                                                   |
+| ami-1c1d9664 | ubuntu/images/hvm-ssd/ubuntu-xenial-16.04-amd64-server-20180222-d83d0782-cb94-46d7-8993-f4ce15d1a484-ami-ee4eac93.4 |
+| ami-6443d61c | ubuntu/images/hvm-ssd/ubuntu-xenial-16.04-amd64-server-20180503.2.2                                                 |
+| ami-e441d49c | ubuntu/images/hvm-ssd/ubuntu-xenial-16.04-amd64-server-20180305.2                                                   |
+| ami-4e79ed36 | ubuntu/images/hvm-ssd/ubuntu-xenial-16.04-amd64-server-20180306                                                     |
+| ami-ca89eeb2 | ubuntu/images/hvm-ssd/ubuntu-xenial-16.04-amd64-server-20180405                                                     |
+| ami-51e99c29 | ubuntu/images/hvm-ssd/ubuntu-xenial-16.04-amd64-server-20180427                                                     |
+
+Mysteriously, the 20180306 image is the one provided for 16.04 LTS in the EC2 console. Is it possible to identify which one this is from the CLI?
+
+Compare output of =aws ec2 describe-images --image-ids= for each using http://www.jsondiff.com: nope.
+
+So the options are to look up the most recent AMI using the CLI, or use the console to choose the one suggested by Amazon. The latter can be done like this:
+
+#+BEGIN_SRC sh
+aws ec2 describe-images --filters "Name=name,Values=ubuntu/images/hvm-ssd/ubuntu-xenial-16.04-amd64-server*" | \
+jq -r '.Images | sort_by(.CreationDate) | .[-1].ImageId'
+#+END_SRC
+
+Now to replace the mapping operation in the template with a parameter...
+
+
+
+
 
 https://github.com/awslabs/aws-cloudformation-templates/blob/master/aws/solutions/HelperNonAmaznAmi/ubuntu16.04LTS_cfn-hup.template
 
