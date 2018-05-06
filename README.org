@@ -13,6 +13,7 @@
 - Getting Started Guide: https://docs.aws.amazon.com/AWSCloudFormation/latest/UserGuide/GettingStarted.Walkthrough.html
 - VPC: https://docs.aws.amazon.com/AWSCloudFormation/latest/UserGuide/sample-templates-services-us-west-2.html#w2ab2c23c48c13c39
 - Single and multi-server web apps (LAMP stacks): https://docs.aws.amazon.com/AWSCloudFormation/latest/UserGuide/sample-templates-appframeworks-us-west-2.html
+- CloudFormer - https://docs.aws.amazon.com/AWSCloudFormation/latest/UserGuide/cfn-using-cloudformer.html
 
 * AWS CLI
 
@@ -350,26 +351,8 @@ EOF
 
 #+RESULTS:
 
-* CloudFormer
-
-- https://docs.aws.amazon.com/AWSCloudFormation/latest/UserGuide/cfn-using-cloudformer.html
-
-* questions
-
-Assuming that I'd like to get a basic webserver + database in a VPC up
-and running before tackling adding a load balancer...
-
-- should I set up EC2 instances as reserved instance? How?
-- how do I add a common tag to all resources to track billing?
-- confirm appropriate use of =create-stack= vs =deploy=
-- how do I generate a template with a different set of AMI mapping so that
-  I'm using ubuntu 16.04?
-- how do associate an existing elastic IP, and prevent this IP from
-  being deleted along with the stack when the stack is terminated?
-- what's the best way to go about adding an RDS instance in the VPC
-  accessible from the EC2 instance? CloudFormer?
-
-** Selecting an ami
+* Using an Ubintu 16.04 LTS AMI
+** identifying the AMI
 
 The strategy used in the template (a nested mapping of architectures
 to instance types to amis using two different mapping objects) seem
@@ -460,10 +443,91 @@ jq -r '.Images | sort_by(.CreationDate) | .[-1].ImageId'
 
 Now to replace the mapping operation in the template with a parameter...
 
+- define a parameter "AMIId":
 
+: {
+:     "ParameterKey": "AMIId",
+:     "DefaultValue": "ami-4e79ed36",
+:     "NoEcho": false,
+:     "Description": "AMI ID for Ubiuntu 16.04"
+: },
 
+The reference to the AMI ID is in the Webserver resource, so that
+needs to be updated later.
 
+** Update the webserver resource
 
-https://github.com/awslabs/aws-cloudformation-templates/blob/master/aws/solutions/HelperNonAmaznAmi/ubuntu16.04LTS_cfn-hup.template
+Found an example, downloaded to =tenplates/=:
 
-https://raw.githubusercontent.com/awslabs/aws-cloudformation-templates/master/aws/solutions/HelperNonAmaznAmi/ubuntu16.04LTS_cfn-hup.template
+- https://github.com/awslabs/aws-cloudformation-templates/blob/master/aws/solutions/HelperNonAmaznAmi/ubuntu16.04LTS_cfn-hup.template
+
+Note that the VPC template identifies the EC2 instance as
+"WebServerInstance" but the template above calls it "EC2Instance", and
+this attribute is referred to in the body of the instance definition.
+Let's hope that it's as simple as replacing one string with the other.
+
+Create params for the new template (will add AMI ID and ssh access policy later)
+
+#+BEGIN_SRC sh :results output
+source setenv.sh
+bin/params.py KeyName=$AWS_KEY_NAME -o templates/vpc-single-ec2-ubuntu-params.json
+cat templates/vpc-single-ec2-ubuntu-params.json
+#+END_SRC
+
+#+RESULTS:
+: [
+:     {
+:         "ParameterKey": "KeyName",
+:         "ParameterValue": "vpc-test.pem"
+:     }
+: ]
+
+#+BEGIN_SRC sh
+aws cloudformation create-stack \
+    --template-body file://templates/vpc-single-ec2-ubuntu.json \
+    --parameters file://templates/vpc-single-ec2-ubuntu-params.json \
+    --stack-name vpc-single-ec2-ubuntu
+#+END_SRC
+
+#+BEGIN_SRC sh
+aws cloudformation describe-stacks --stack-name vpc-single-ec2-ubuntu
+#+END_SRC
+
+The above returns a stack ID, but checking status shows
+CREATE_IN_PROGRESS, then ROLLBACK_IN_PROGRESS, then
+ROLLBACK_COMPLETE - so some error, but without any diagnostic
+messages in the terminal.
+
+In the stacks console, see some messages that seem related to the error
+
+: The following resource(s) failed to create:
+: [OutBoundHTTPNetworkAclEntry, Subnet, AttachGateway,
+: OutBoundResponsePortsNetworkAclEntry, WebServerInstance,
+: InboundSSHNetworkAclEntry, InboundResponsePortsNetworkAclEntry,
+: OutBoundHTTPSNetworkAclEntry, InboundHTTPNetworkAclEntry]. . Rollback
+: requested by user.
+
+and associated with WebServerInstance:
+
+: The security group 'sg-2fb58a51' does not exist
+
+So, some problem related to the creation of the security group?
+
+As far as I can tell, the security group definition (and the reference
+to it) is no different here than it is in the working test template
+above.
+
+* questions
+
+Assuming that I'd like to get a basic webserver + database in a VPC up
+and running before tackling adding a load balancer...
+
+- should I set up EC2 instances as reserved instance? How?
+- how do I add a common tag to all resources to track billing?
+- confirm appropriate use of =create-stack= vs =deploy=
+- how do I generate a template with a different set of AMI mapping so that
+  I'm using ubuntu 16.04?
+- how do associate an existing elastic IP, and prevent this IP from
+  being deleted along with the stack when the stack is terminated?
+- what's the best way to go about adding an RDS instance in the VPC
+  accessible from the EC2 instance? CloudFormer?
