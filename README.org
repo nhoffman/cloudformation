@@ -517,6 +517,26 @@ As far as I can tell, the security group definition (and the reference
 to it) is no different here than it is in the working test template
 above.
 
+Got some help on the template...
+
+: It looks like there are a couple of things missing (please see attached diff):
+:
+: - A subnet was not being referenced in the EC2 instance, so it was
+:   launching in the default VPC (security group only existed in the new
+:   VPC)
+: - Security Group reference needed to be the ID
+: - The instance needed a public IP address (I added it on the subnet
+:   level, but it could be done individually)
+
+#+BEGIN_SRC sh
+ec2_id=$(aws cloudformation describe-stack-resources --stack-name vpc-single-ec2-ubuntu | jq -r '.StackResources[] | select(.ResourceType == "AWS::EC2::Instance") | .PhysicalResourceId')
+public_ip=$(aws ec2 describe-instances --instance-ids $ec2_id | jq -r '.Reservations[] | .Instances[] | .PublicIpAddress')
+#+END_SRC
+
+#+BEGIN_SRC sh
+ssh -i $AWS_KEY_PATH ubuntu@$public_ip
+#+END_SRC
+
 * questions
 
 Assuming that I'd like to get a basic webserver + database in a VPC up
