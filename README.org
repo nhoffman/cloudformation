@@ -537,6 +537,24 @@ public_ip=$(aws ec2 describe-instances --instance-ids $ec2_id | jq -r '.Reservat
 ssh -i $AWS_KEY_PATH ubuntu@$public_ip
 #+END_SRC
 
+* Add an RDS instance in a private subnet
+** resources
+- https://docs.aws.amazon.com/AWSCloudFormation/latest/UserGuide/aws-properties-rds-database-instance.html
+- https://docs.aws.amazon.com/AmazonRDS/latest/UserGuide/USER_VPC.WorkingWithRDSInstanceinaVPC.html
+- https://stackoverflow.com/questions/37038489/how-to-add-a-rds-instance-to-a-vpc-using-aws-cloudformation
+- http://www.stojanveselinovski.com/blog/2016/01/12/simple-postgresql-rds-cloudformation-template/
+- https://docs.aws.amazon.com/AmazonRDS/latest/UserGuide/USER_VPC.Scenarios.html#USER_VPC.Scenario1
+- https://serverfault.com/questions/739179/aws-vpc-public-private-subnets-ec2-instance-cannot-reach-rds-instance
+
+** RDS questions
+
+- what's the best way to go about adding an RDS instance in the VPC
+  accessible from the EC2 instance? CloudFormer?
+- how should parameters containing secrets (like RDS
+  MasterUserPassword) be passed to the template?
+- should I define RDS security groups or VPC security groups?
+- how do I create a snapshot with the CLI?
+
 * questions
 
 Assuming that I'd like to get a basic webserver + database in a VPC up
@@ -544,10 +562,8 @@ and running before tackling adding a load balancer...
 
 - should I set up EC2 instances as reserved instance? How?
 - how do I add a common tag to all resources to track billing?
-- confirm appropriate use of =create-stack= vs =deploy=
-- how do I generate a template with a different set of AMI mapping so that
+- [X] confirm appropriate use of =create-stack= vs =deploy=
+- [X] how do I generate a template with a different set of AMI mapping so that
   I'm using ubuntu 16.04?
 - how do associate an existing elastic IP, and prevent this IP from
   being deleted along with the stack when the stack is terminated?
-- what's the best way to go about adding an RDS instance in the VPC
-  accessible from the EC2 instance? CloudFormer?
