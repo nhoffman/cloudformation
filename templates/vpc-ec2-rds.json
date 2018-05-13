@@ -379,7 +379,35 @@
              "         --resource WebServerInstance ",
              "         --region ", { "Ref" : "AWS::Region" }, "\n"
             ]]}}}
-    }
+    },
+
+"DBSubnet1" : {
+   "Type" : "AWS::EC2::Subnet",
+   "Properties" : {
+      "CidrBlock" : "10.0.1.0/24",
+      "VpcId" : { "Ref" : "VPC" }
+   }
+},
+
+"DBSubnet2" : {
+   "Type" : "AWS::EC2::Subnet",
+   "Properties" : {
+      "CidrBlock" : "10.0.2.0/24",
+      "VpcId" : { "Ref" : "VPC" }
+   }
+},
+
+"DBSubnetGroup" : {
+   "Type" : "AWS::RDS::DBSubnetGroup",
+   "Properties" : {
+      "SubnetIds" : [
+          { "Ref" : "DBSubnet1" },
+          { "Ref" : "DBSubnet2" }
+      ]
+   }
+}
+
+
   },
 
   "Outputs" : {
