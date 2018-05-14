@@ -30,12 +30,62 @@
       "ConstraintDescription": "must be a valid IP CIDR range of the form x.x.x.x/x."
     },
 
-      "AMIId" : {
-	  "Description": "AMI ID for Ubiuntu 16.04",
-	  "Type": "String",
-	  "ConstraintDescription": "An AMI ID for Ubiuntu 16.04 that is available in the current region",
-	  "Default": "ami-4e79ed36"
-      }
+    "AMIId" : {
+	"Description": "AMI ID for Ubiuntu 16.04",
+	"Type": "String",
+	"ConstraintDescription": "An AMI ID for Ubiuntu 16.04 that is available in the current region",
+	"Default": "ami-4e79ed36"
+    },
+
+    "DBName": {
+      "Default": "oltg",
+      "Description" : "The database name",
+      "Type": "String",
+      "MinLength": "1",
+      "MaxLength": "64",
+      "AllowedPattern" : "[a-zA-Z][a-zA-Z0-9]*",
+      "ConstraintDescription" : "must begin with a letter and contain only alphanumeric characters."
+    },
+
+    "DBUsername": {
+      "Default": "oltg",
+      "NoEcho": "true",
+      "Description" : "The database admin account username",
+      "Type": "String",
+      "MinLength": "1",
+      "MaxLength": "16",
+      "AllowedPattern" : "[a-zA-Z][a-zA-Z0-9]*",
+      "ConstraintDescription" : "must begin with a letter and contain only alphanumeric characters."
+    },
+
+    "DBPassword": {
+      "Default": "password",
+      "NoEcho": "true",
+      "Description" : "The database admin account password",
+      "Type": "String",
+      "MinLength": "8",
+      "MaxLength": "41",
+      "AllowedPattern" : "[a-zA-Z0-9]*",
+      "ConstraintDescription" : "must contain only alphanumeric characters."
+    },
+
+    "DBClass" : {
+      "Default" : "db.t2.micro",
+      "Description" : "Database instance class",
+      "Type" : "String",
+      "AllowedValues" : ["db.t2.micro", "db.t2.small"],
+      "ConstraintDescription" : "must select a valid database instance type."
+    },
+
+    "DBAllocatedStorage" : {
+      "Default": "5",
+      "Description" : "The size of the database (Gb)",
+      "Type": "Number",
+      "MinValue": "5",
+      "MaxValue": "1024",
+      "ConstraintDescription" : "must be between 5 and 1024Gb."
+    }
+
   },
 
   "Mappings" : {
@@ -293,7 +343,6 @@
       }
     },
 
-
     "WebServerInstance" : {
       "Type" : "AWS::EC2::Instance",
       "CreationPolicy" : {
@@ -381,48 +430,65 @@
             ]]}}}
     },
 
-"DBSubnet1" : {
-   "Type" : "AWS::EC2::Subnet",
-   "Properties" : {
-      "AvailabilityZone" : "us-west-2a",
-      "CidrBlock" : "10.0.1.0/24",
-      "VpcId" : { "Ref" : "VPC" }
-   }
-},
+    "DBSubnet1" : {
+       "Type" : "AWS::EC2::Subnet",
+       "Properties" : {
+	  "AvailabilityZone" : "us-west-2a",
+	  "CidrBlock" : "10.0.1.0/24",
+	  "VpcId" : { "Ref" : "VPC" }
+       }
+    },
 
-"DBSubnet2" : {
-   "Type" : "AWS::EC2::Subnet",
-   "Properties" : {
-      "AvailabilityZone" : "us-west-2b",
-      "CidrBlock" : "10.0.2.0/24",
-      "VpcId" : { "Ref" : "VPC" }
-   }
-},
+    "DBSubnet2" : {
+       "Type" : "AWS::EC2::Subnet",
+       "Properties" : {
+	  "AvailabilityZone" : "us-west-2b",
+	  "CidrBlock" : "10.0.2.0/24",
+	  "VpcId" : { "Ref" : "VPC" }
+       }
+    },
 
-"DBSubnetGroup" : {
-    "Type" : "AWS::RDS::DBSubnetGroup",
-    "Properties" : {
-	"DBSubnetGroupDescription" : "Private subnet group for oltg database",
-	"SubnetIds" : [
-	    { "Ref" : "DBSubnet1" },
-	    { "Ref" : "DBSubnet2" }
-	]
+    "DBSubnetGroup" : {
+	"Type" : "AWS::RDS::DBSubnetGroup",
+	"Properties" : {
+	    "DBSubnetGroupDescription" : "Private subnet group for oltg database",
+	    "SubnetIds" : [
+		{ "Ref" : "DBSubnet1" },
+		{ "Ref" : "DBSubnet2" }
+	    ]
+	}
+    },
+
+    "DBEC2SecurityGroup": {
+      "Type": "AWS::EC2::SecurityGroup",
+      "Properties" : {
+	"GroupDescription" : "Access from EC2 instance to database instance",
+	"VpcId"            : { "Ref" : "VPC" },
+	"SecurityGroupIngress" : [{
+	  "IpProtocol" : "tcp",
+	  "FromPort"   : 5432,
+	  "ToPort"     : 5432,
+	  "CidrIp"     : "0.0.0.0/0"
+	}],
+       "Tags" : [ {"Key" : "Name", "Value" : "oltg_db_sg" } ]
+      }
+    },
+
+    "DatabaseInstance" : {
+	"Type" : "AWS::RDS::DBInstance",
+	"Properties" : {
+	    "DBInstanceIdentifier" : "oltg-db",
+	    "DBName" : { "Ref" : "DBName" },
+	    "AllocatedStorage" : { "Ref" : "DBAllocatedStorage" },
+	    "DBInstanceClass" : { "Ref" : "DBClass" },
+	    "Engine" : "postgres",
+	    "EngineVersion" : "9.6",
+	    "MasterUsername" : { "Ref" : "DBUsername" } ,
+	    "MasterUserPassword" : { "Ref" : "DBPassword" },
+	    "DBSubnetGroupName" : { "Ref" : "DBSubnetGroup" },
+	    "VPCSecurityGroups" : [ { "Ref" : "DBEC2SecurityGroup" } ]
+	}
     }
-},
-
-"DBEC2SecurityGroup": {
-  "Type": "AWS::EC2::SecurityGroup",
-  "Properties" : {
-    "GroupDescription" : "Frontend Access",
-    "VpcId"            : { "Ref" : "VPC" },
-    "SecurityGroupIngress" : [{
-      "IpProtocol" : "tcp",
-      "FromPort"   : 5432,
-      "ToPort"     : 5432,
-      "CidrIp"     : "0.0.0.0/0"
-    }]
-  }
-}
 
   },
 
