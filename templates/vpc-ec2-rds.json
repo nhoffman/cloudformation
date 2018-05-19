@@ -16,8 +16,13 @@
 
     "KeyName": {
       "Description" : "Name of an existing EC2 KeyPair to enable SSH access to the instance",
-      "Type": "AWS::EC2::KeyPair::KeyName",
+      "Type" : "AWS::EC2::KeyPair::KeyName",
       "ConstraintDescription" : "must be the name of an existing EC2 KeyPair."
+    },
+
+    "ElasticIPAllocationId" : {
+	"Description" : "AllocationId for Elastic IP Address",
+	"Type" : "String"
     },
 
     "SSHLocation" : {
@@ -322,13 +327,12 @@
       }
     },
 
-    "IPAddress" : {
-      "Type" : "AWS::EC2::EIP",
-      "DependsOn" : "AttachGateway",
-      "Properties" : {
-        "Domain" : "vpc",
-        "InstanceId" : { "Ref" : "WebServerInstance" }
-      }
+    "IPAssoc" : {
+         "Type" : "AWS::EC2::EIPAssociation",
+         "Properties" : {
+	     "AllocationId" : { "Ref" : "ElasticIPAllocationId" },
+             "InstanceId" : { "Ref" : "WebServerInstance" }
+         }
     },
 
     "InstanceSecurityGroup" : {
