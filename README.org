@@ -545,6 +545,149 @@ ssh -i $AWS_KEY_PATH ubuntu@$public_ip
 - http://www.stojanveselinovski.com/blog/2016/01/12/simple-postgresql-rds-cloudformation-template/
 - https://docs.aws.amazon.com/AmazonRDS/latest/UserGuide/USER_VPC.Scenarios.html#USER_VPC.Scenario1
 - https://serverfault.com/questions/739179/aws-vpc-public-private-subnets-ec2-instance-cannot-reach-rds-instance
+- https://github.com/stelligent/cloudformation_templates#database
+- https://gist.github.com/smagch/62bcb7cc78cc0d03492a
+
+** manually-created instance
+
+Let's describe some of the resources used by the prototype
+applications that were manually created from the console.
+
+*** Subnets
+
+#+BEGIN_SRC sh
+aws ec2 describe-subnets --filters='Name=tag-value,Values=oltg*'
+{
+    "Subnets": [
+        {
+            "AvailabilityZone": "us-west-2b",
+            "AvailableIpAddressCount": 251,
+            "CidrBlock": "10.0.2.0/24",
+            "DefaultForAz": false,
+            "MapPublicIpOnLaunch": false,
+            "State": "available",
+            "SubnetId": "subnet-0c92857a",
+            "VpcId": "vpc-48aa772f",
+            "AssignIpv6AddressOnCreation": false,
+            "Ipv6CidrBlockAssociationSet": [],
+            "Tags": [
+                {
+                    "Key": "Name",
+                    "Value": "oltg_private2"
+                }
+            ]
+        },
+        {
+            "AvailabilityZone": "us-west-2a",
+            "AvailableIpAddressCount": 250,
+            "CidrBlock": "10.0.1.0/24",
+            "DefaultForAz": false,
+            "MapPublicIpOnLaunch": false,
+            "State": "available",
+            "SubnetId": "subnet-1fb24e78",
+            "VpcId": "vpc-48aa772f",
+            "AssignIpv6AddressOnCreation": false,
+            "Ipv6CidrBlockAssociationSet": [],
+            "Tags": [
+                {
+                    "Key": "Name",
+                    "Value": "oltg_private1"
+                }
+            ]
+        },
+        {
+            "AvailabilityZone": "us-west-2a",
+            "AvailableIpAddressCount": 249,
+            "CidrBlock": "10.0.0.0/24",
+            "DefaultForAz": false,
+            "MapPublicIpOnLaunch": false,
+            "State": "available",
+            "SubnetId": "subnet-1db24e7a",
+            "VpcId": "vpc-48aa772f",
+            "AssignIpv6AddressOnCreation": false,
+            "Ipv6CidrBlockAssociationSet": [],
+            "Tags": [
+                {
+                    "Key": "Name",
+                    "Value": "oltg_public"
+                }
+            ]
+        }
+    ]
+}
+#+END_SRC
+
+#+BEGIN_SRC sh
+(py3-env) cloudformation % aws --output text ec2 describe-subnets --filters='Name=tag-value,Values=oltg*'
+SUBNETS	False	us-west-2b	251	10.0.2.0/24	False	False	available	subnet-0c92857a	vpc-48aa772f
+TAGS	Name	oltg_private2
+SUBNETS	False	us-west-2a	250	10.0.1.0/24	False	False	available	subnet-1fb24e78	vpc-48aa772f
+TAGS	Name	oltg_private1
+SUBNETS	False	us-west-2a	249	10.0.0.0/24	False	False	available	subnet-1db24e7a	vpc-48aa772f
+TAGS	Name	oltg_public
+#+END_SRC
+
+*** security groups
+
+#+BEGIN_SRC sh
+(py3-env) cloudformation % aws --output text ec2 describe-security-groups --filters='Name=tag-value,Values=oltg*'
+SECURITYGROUPS	Security Group for OLTG webserver and DB	sg-b8e7ecc1	oltg_vpc_sg	721970950229	vpc-48aa772f
+IPPERMISSIONS	80	tcp	80
+IPRANGES	0.0.0.0/0
+IPPERMISSIONS	22	tcp	22
+IPRANGES	173.250.164.44/32
+IPRANGES	128.95.186.130/32
+IPRANGES	128.95.186.43/32
+IPPERMISSIONS	443	tcp	443
+IPRANGES	0.0.0.0/0
+IPV6RANGES	::/0
+IPPERMISSIONSEGRESS	-1
+IPRANGES	0.0.0.0/0
+TAGS	Name	oltg_vpc_sg
+SECURITYGROUPS	OLTG DB Instance Security Group	sg-c37278ba	oltg_db_sg	721970950229	vpc-48aa772f
+IPPERMISSIONS	5432	tcp	5432
+USERIDGROUPPAIRS	sg-b8e7ecc1	721970950229
+IPPERMISSIONSEGRESS	-1
+IPRANGES	0.0.0.0/0
+TAGS	Name	oltg_db_sg
+#+END_SRC
+
+** creation and introspection
+
+#+BEGIN_SRC sh
+aws cloudformation create-stack \
+    --template-body file://templates/vpc-ec2-rds.json \
+    --parameters file://templates/vpc-ec2-rds-params.json \
+    --stack-name vpc-ec2-rds
+#+END_SRC
+
+Property DBSubnetGroupDescription cannot be empty.
+
+DB Subnet Group doesn't meet availability zone coverage requirement. Please add subnets to cover at least 2 availability zones. Current coverage: 1
+
+#+BEGIN_SRC sh
+aws cloudformation describe-stacks --stack-name vpc-ec2-rds
+#+END_SRC
+
+#+BEGIN_SRC sh
+aws cloudformation deploy --template-file templates/vpc-ec2-rds.json --stack-name vpc-ec2-rds
+#+END_SRC
+
+"DatabaseInstance" : {
+  "Type" : "AWS::RDS::DBInstance",
+  "Properties" : {
+    "DBName" : { "Ref" : "DBName" },
+    "AllocatedStorage" : { "Ref" : "DBAllocatedStorage" },
+    "DBInstanceClass" : { "Ref" : "DBClass" },
+    "Engine" : "postgres",
+    "EngineVersion" : "9.6",
+    "MasterUsername" : { "Ref" : "DBUsername" } ,
+    "MasterUserPassword" : { "Ref" : "DBPassword" },
+    "DBSubnetGroupName" : { "Ref" : "DBSubnetGroup" },
+    "DBSecurityGroups" : [ { "Ref" : "DBEC2SecurityGroup" } ]
+  }
+}
+
 
 ** RDS questions
 
